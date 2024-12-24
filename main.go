@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -71,10 +72,33 @@ func main() {
 }
 
 func createDelivery(c echo.Context) error {
-	extractor := b3.ExtractHTTP(c.Request())
-	spanContext, err := extractor()
-	span := tracer.StartSpan("createDelivery", zipkin.Kind(model.Client), zipkin.Parent(*spanContext))
+	span := tracer.StartSpan("createDelivery", zipkin.Kind(model.Server))
 	defer span.Finish()
+
+	req, _ := http.NewRequest("POST", "http://localhost:8082/orders", http.NoBody)
+	req.Header.Set("Content-Type", "application/json")
+
+	b3.InjectHTTP(req)(span.Context())
+
+	client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        span.Tag("error", err.Error())
+        return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to call restaurant service"})
+    }
+    defer resp.Body.Close()
+
+    // Check response status
+    if resp.StatusCode != http.StatusOK {
+        return c.JSON(resp.StatusCode, map[string]string{"error": "Restaurant service returned error"})
+    }
+	
+	var orders 
+
+	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
+		span.Tag("error", err.Error())
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to parse restaurant response"})
+	}
 
 	var delivery Delivery
 	if err := c.Bind(&delivery); err != nil {
