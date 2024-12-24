@@ -53,9 +53,6 @@ func main() {
 	}
 	defer mongoClient.Disconnect(context.TODO())
 
-	// Initialize Zipkin tracer
-	//var addressKafka []string
-	//addressKafka = append(addressKafka, "localhost:9092")
 	reporter := httpReporter.NewReporter(zipkinEndpoint)
 
 	endpoint, _ := zipkin.NewEndpoint("order-service", "localhost:"+serverPort)
