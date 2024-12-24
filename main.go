@@ -48,7 +48,7 @@ func main() {
 
 	mongoURI := os.Getenv("MONGO_URI")
 	zipkinEndpoint := os.Getenv("ZIPKIN_ENDPOINT")
-	serverPort := os.Getenv("SERVER_PORT")
+	serverPort := os.Getenv("RESTAURANT_SERVICE_PORT")
 
 	// Initialize Zipkin tracer
 	reporter := httoReporter.NewReporter(zipkinEndpoint)
