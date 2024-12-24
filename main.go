@@ -36,7 +36,7 @@ func main() {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
 
-	mongoURI := os.Getenv("MONGO_URI")
+	mongoURI := os.Getenv("MONGODB_URI")
 	//zipkinEndpoint := os.Getenv("ZIPKIN_ENDPOINT")
 	serverPort := os.Getenv("DELIVERY_SERVICE_PORT")
 
