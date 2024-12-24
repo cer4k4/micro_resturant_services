@@ -39,7 +39,7 @@ type Menu struct {
 type Order struct {
 	ID           primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	RestaurantID string             `bson:"restaurant_id" json:"restaurant_id"`
-	Items        []OrderItem        `bson:"items" json:"items"`
+	Items        []OrderItem        `bson:"items,omitempty" json:"items"`
 	Status       string             `bson:"status" json:"status"`
 }
 
@@ -105,7 +105,7 @@ func createOrder(c echo.Context) error {
 	}
 	defer resp.Body.Close()
 
-	var restaurantResponse Restaurant
+	var restaurantResponse []Restaurant
 
 	if err := json.NewDecoder(resp.Body).Decode(&restaurantResponse); err != nil {
 		span.Tag("error", err.Error())
@@ -118,8 +118,10 @@ func createOrder(c echo.Context) error {
 		span.Tag("error", err.Error())
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
 	}
-	order.RestaurantID = restaurantResponse.ID.String()
+	order.RestaurantID = restaurantResponse[0].ID.String()
+	order.Items = append(order.Items, OrderItem{MenuID: restaurantResponse[0].Menu[0].ID.String(), Quantity: 2, UnitPrice: restaurantResponse[0].Menu[0].Price})
 	order.Status = "Pending"
+
 	collection := mongoClient.Database("orderdb").Collection("orders")
 	result, err := collection.InsertOne(context.TODO(), order)
 	if err != nil {
