@@ -19,6 +19,23 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+type Restaurant struct {
+	ID       primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	Name     string             `bson:"name" json:"name"`
+	Address  string             `bson:"address" json:"address"`
+	Cuisine  string             `bson:"cuisine" json:"cuisine"`
+	Menu     []Menu             `bson:"menu" json:"menu"`
+	IsActive bool               `bson:"is_active" json:"is_active"`
+}
+
+type Menu struct {
+	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	Name        string             `bson:"name" json:"name"`
+	Description string             `bson:"description" json:"description"`
+	Price       float64            `bson:"price" json:"price"`
+	Category    string             `bson:"category" json:"category"`
+}
+
 type Order struct {
 	ID           primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	RestaurantID string             `bson:"restaurant_id" json:"restaurant_id"`
@@ -88,17 +105,20 @@ func createOrder(c echo.Context) error {
 	}
 	defer resp.Body.Close()
 
+	var restaurantResponse Restaurant
+
 	if err := json.NewDecoder(resp.Body).Decode(&restaurantResponse); err != nil {
 		span.Tag("error", err.Error())
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to parse restaurant response"})
 	}
 
 	var order Order
+
 	if err := c.Bind(&order); err != nil {
 		span.Tag("error", err.Error())
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
 	}
-
+	order.RestaurantID = restaurantResponse.ID.String()
 	order.Status = "Pending"
 	collection := mongoClient.Database("orderdb").Collection("orders")
 	result, err := collection.InsertOne(context.TODO(), order)
