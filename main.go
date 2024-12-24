@@ -10,7 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/openzipkin/zipkin-go"
-	"github.com/openzipkin/zipkin-go/reporter/kafka"
+	httoReporter "github.com/openzipkin/zipkin-go/reporter/http"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -36,7 +36,6 @@ type Menu struct {
 
 var (
 	mongoClient *mongo.Client
-	tracer      *zipkin.Tracer
 )
 
 func main() {
@@ -46,8 +45,14 @@ func main() {
 	}
 
 	mongoURI := os.Getenv("MONGO_URI")
-	//zipkinEndpoint := os.Getenv("ZIPKIN_ENDPOINT")
+	zipkinEndpoint := os.Getenv("ZIPKIN_ENDPOINT")
 	serverPort := os.Getenv("SERVER_PORT")
+
+	// Initialize Zipkin tracer
+	reporter := httoReporter.NewReporter(zipkinEndpoint)
+
+	endpoint, _ := zipkin.NewEndpoint("restaurant-service", "localhost:"+serverPort)
+	tracer, _ := zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(endpoint))
 
 	// Initialize MongoDB client
 	var err error
@@ -57,15 +62,14 @@ func main() {
 	}
 	defer mongoClient.Disconnect(context.TODO())
 
-	// Initialize Zipkin tracer
-	var addressKafka []string
-	addressKafka = append(addressKafka, "localhost:9092")
-	reporter, err := kafka.NewReporter(addressKafka)
-
-	endpoint, _ := zipkin.NewEndpoint("restaurant-service", "localhost:"+serverPort)
-	tracer, _ = zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(endpoint))
-
 	e := echo.New()
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			c.Set("tracer", tracer)
+			return next(c)
+		}
+	})
+
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
@@ -78,6 +82,7 @@ func main() {
 }
 
 func createRestaurant(c echo.Context) error {
+	tracer := c.Get("tracer").(*zipkin.Tracer)
 	span := tracer.StartSpan("createRestaurant")
 	defer span.Finish()
 
@@ -88,6 +93,7 @@ func createRestaurant(c echo.Context) error {
 	}
 
 	collection := mongoClient.Database("restaurantdb").Collection("restaurants")
+
 	result, err := collection.InsertOne(context.TODO(), restaurant)
 	if err != nil {
 		span.Tag("error", err.Error())
@@ -95,10 +101,12 @@ func createRestaurant(c echo.Context) error {
 	}
 
 	restaurant.ID = result.InsertedID.(primitive.ObjectID)
+	span.Tag("resturant_created_succusful", restaurant.ID.String())
 	return c.JSON(http.StatusCreated, restaurant)
 }
 
 func listRestaurants(c echo.Context) error {
+	tracer := c.Get("tracer").(*zipkin.Tracer)
 	span := tracer.StartSpan("listRestaurants")
 	defer span.Finish()
 
@@ -119,6 +127,5 @@ func listRestaurants(c echo.Context) error {
 		}
 		restaurants = append(restaurants, restaurant)
 	}
-
 	return c.JSON(http.StatusOK, restaurants)
 }
