@@ -10,6 +10,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/openzipkin/zipkin-go"
+	"github.com/openzipkin/zipkin-go/model"
+	"github.com/openzipkin/zipkin-go/propagation/b3"
 	httpReporter "github.com/openzipkin/zipkin-go/reporter/http"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -69,7 +71,9 @@ func main() {
 }
 
 func createDelivery(c echo.Context) error {
-	span := tracer.StartSpan("createDelivery")
+	extractor := b3.ExtractHTTP(c.Request())
+	spanContext, err := extractor()
+	span := tracer.StartSpan("createDelivery", zipkin.Kind(model.Client), zipkin.Parent(*spanContext))
 	defer span.Finish()
 
 	var delivery Delivery
