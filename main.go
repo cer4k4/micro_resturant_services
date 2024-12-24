@@ -10,6 +10,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/openzipkin/zipkin-go"
+	"github.com/openzipkin/zipkin-go/model"
+	"github.com/openzipkin/zipkin-go/propagation/b3"
 	httoReporter "github.com/openzipkin/zipkin-go/reporter/http"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -106,8 +108,14 @@ func createRestaurant(c echo.Context) error {
 }
 
 func listRestaurants(c echo.Context) error {
+
 	tracer := c.Get("tracer").(*zipkin.Tracer)
-	span := tracer.StartSpan("listRestaurants")
+	extractor := b3.ExtractHTTP(c.Request())
+	spanContext, err := extractor()
+	if err != nil {
+		log.Println("extractor faild", err)
+	}
+	span := tracer.StartSpan("listRestaurants", zipkin.Kind(model.Client), zipkin.Parent(*spanContext))
 	defer span.Finish()
 
 	collection := mongoClient.Database("restaurantdb").Collection("restaurants")
