@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/openzipkin/zipkin-go"
+	"github.com/openzipkin/zipkin-go/propagation/b3"
 	httpReporter "github.com/openzipkin/zipkin-go/reporter/http"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -73,6 +75,23 @@ func main() {
 func createOrder(c echo.Context) error {
 	span := tracer.StartSpan("createOrder")
 	defer span.Finish()
+
+	req, _ := http.NewRequest("GET", "http://localhost:8080/restaurants", http.NoBody)
+	req.Header.Set("Content-Type", "application/json")
+	b3.InjectHTTP(req)(span.Context())
+	client := &http.Client{}
+
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode == 400 {
+		span.Tag("error", err.Error())
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to call Service 2"})
+	}
+	defer resp.Body.Close()
+
+	if err := json.NewDecoder(resp.Body).Decode(&restaurantResponse); err != nil {
+		span.Tag("error", err.Error())
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to parse restaurant response"})
+	}
 
 	var order Order
 	if err := c.Bind(&order); err != nil {
