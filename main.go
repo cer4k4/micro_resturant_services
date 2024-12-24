@@ -10,7 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/openzipkin/zipkin-go"
-	"github.com/openzipkin/zipkin-go/reporter/kafka"
+	httpReporter "github.com/openzipkin/zipkin-go/reporter/http"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -37,7 +37,7 @@ func main() {
 	}
 
 	mongoURI := os.Getenv("MONGODB_URI")
-	//zipkinEndpoint := os.Getenv("ZIPKIN_ENDPOINT")
+	zipkinEndpoint := os.Getenv("ZIPKIN_ENDPOINT")
 	serverPort := os.Getenv("DELIVERY_SERVICE_PORT")
 
 	// Initialize MongoDB client
@@ -51,7 +51,7 @@ func main() {
 	// Initialize Zipkin tracer
 	var addressKafka []string
 	addressKafka = append(addressKafka, "localhost:9092")
-	reporter, err := kafka.NewReporter(addressKafka)
+	reporter := httpReporter.NewReporter(zipkinEndpoint)
 
 	endpoint, _ := zipkin.NewEndpoint("delivery-service", "localhost:"+serverPort)
 	tracer, _ = zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(endpoint))
