@@ -20,6 +20,19 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+type Order struct {
+	ID           primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	RestaurantID string             `bson:"restaurant_id" json:"restaurant_id"`
+	Items        []OrderItem        `bson:"items,omitempty" json:"items"`
+	Status       string             `bson:"status" json:"status"`
+}
+
+type OrderItem struct {
+	MenuID    string  `bson:"menu_id" json:"menu_id"`
+	Quantity  int     `bson:"quantity" json:"quantity"`
+	UnitPrice float64 `bson:"unit_price" json:"unit_price"`
+}
+
 type Delivery struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	OrderID   string             `bson:"order_id" json:"order_id"`
@@ -81,19 +94,19 @@ func createDelivery(c echo.Context) error {
 	b3.InjectHTTP(req)(span.Context())
 
 	client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
-        span.Tag("error", err.Error())
-        return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to call restaurant service"})
-    }
-    defer resp.Body.Close()
+	resp, err := client.Do(req)
+	if err != nil {
+		span.Tag("error", err.Error())
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to call restaurant service"})
+	}
+	defer resp.Body.Close()
 
-    // Check response status
-    if resp.StatusCode != http.StatusOK {
-        return c.JSON(resp.StatusCode, map[string]string{"error": "Restaurant service returned error"})
-    }
-	
-	var orders 
+	// Check response status
+	if resp.StatusCode != http.StatusOK {
+		return c.JSON(resp.StatusCode, map[string]string{"error": "Restaurant service returned error"})
+	}
+
+	var orders []Order
 
 	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
 		span.Tag("error", err.Error())
@@ -105,7 +118,8 @@ func createDelivery(c echo.Context) error {
 		span.Tag("error", err.Error())
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
 	}
-
+	delivery.OrderID = orders[0].ID.String()
+	delivery.DriverID = "474747"
 	delivery.Status = "In Progress"
 	collection := mongoClient.Database("deliverydb").Collection("deliveries")
 	result, err := collection.InsertOne(context.TODO(), delivery)
