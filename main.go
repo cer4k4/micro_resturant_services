@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/openzipkin/zipkin-go"
+	"github.com/openzipkin/zipkin-go/model"
 	"github.com/openzipkin/zipkin-go/propagation/b3"
 	httpReporter "github.com/openzipkin/zipkin-go/reporter/http"
 	"go.mongodb.org/mongo-driver/bson"
@@ -90,7 +91,7 @@ func main() {
 }
 
 func createOrder(c echo.Context) error {
-	span := tracer.StartSpan("createOrder")
+	span := tracer.StartSpan("createOrder", zipkin.Kind(model.Server))
 	defer span.Finish()
 
 	req, _ := http.NewRequest("GET", "http://localhost:8080/restaurants", http.NoBody)
@@ -134,7 +135,12 @@ func createOrder(c echo.Context) error {
 }
 
 func listOrders(c echo.Context) error {
-	span := tracer.StartSpan("listOrders")
+	extractor := b3.ExtractHTTP(c.Request())
+	parentspanContext, err := extractor()
+	if err != nil {
+		log.Println("faild extractor from delivery", err)
+	}
+	span := tracer.StartSpan("listOrders", zipkin.Kind(model.Client), zipkin.Parent(*parentspanContext))
 	defer span.Finish()
 
 	collection := mongoClient.Database("orderdb").Collection("orders")
