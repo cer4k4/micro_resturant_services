@@ -11,26 +11,34 @@ import (
 	"github.com/openzipkin/zipkin-go"
 	"github.com/openzipkin/zipkin-go/model"
 	"github.com/openzipkin/zipkin-go/propagation/b3"
+	httpReporter "github.com/openzipkin/zipkin-go/reporter/http"
 )
 
 type Handler interface {
-	CreateDelivery(c echo.Context) error
-	ListDeliveries(c echo.Context) error
+	CreateOrder(c echo.Context) error
+	ListOrders(c echo.Context) error
 }
 
 type handler struct {
-	db databases.MongoDBRepository
+	db           databases.MongoDBRepository
+	configServer models.ServiceConfig
 }
 
-func NewHandler(db databases.MongoDBRepository) handler {
-	return handler{db}
+func NewHandler(db databases.MongoDBRepository, configServer models.ServiceConfig) handler {
+	return handler{db, configServer}
 }
 
 func (h *handler) CreateOrder(c echo.Context) error {
-	tracer := c.Get("tracer").(*zipkin.Tracer)
+	reporter := httpReporter.NewReporter(h.configServer.ZipkinEndpoint)
+	endpoint, _ := zipkin.NewEndpoint("Create Order Service", "localhost:"+h.configServer.ServerPort)
+	tracer, err := zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(endpoint))
+	c.Set("tracer", tracer)
+	if err != nil {
+		log.Println("tracer in Middleware", err)
+	}
 	span := tracer.StartSpan("Create Order Handler", zipkin.Kind(model.Server))
 	defer span.Finish()
-
+	c.Set("span", span)
 	req, err := http.NewRequest("GET", "http://localhost:8081/restaurants", http.NoBody)
 	req.Header.Set("Content-Type", "application/json")
 	b3.InjectHTTP(req)(span.Context())
@@ -68,11 +76,23 @@ func (h *handler) CreateOrder(c echo.Context) error {
 		log.Println("error failed create order ", err)
 		span.Tag("error", err.Error())
 	}
+	span.Tag(string(zipkin.TagHTTPMethod), "POST")
+	span.Tag(string(zipkin.TagHTTPStatusCode), http.StatusText(http.StatusCreated))
+	span.Tag(string(zipkin.TagHTTPUrl), "/orders")
+	cs := c.QueryParams()["pretty"]
+	log.Println(cs)
+	//span.Tag("http-response",)
 	return c.JSON(http.StatusCreated, result)
 }
 
 func (h *handler) ListOrders(c echo.Context) error {
-	tracer := c.Get("tracer").(*zipkin.Tracer)
+	reporter := httpReporter.NewReporter(h.configServer.ZipkinEndpoint)
+	endpoint, _ := zipkin.NewEndpoint("List Order", "localhost:"+h.configServer.ServerPort)
+	tracer, err := zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(endpoint))
+	if err != nil {
+		log.Println("tracer in Middleware", err)
+	}
+
 	extractor := b3.ExtractHTTP(c.Request())
 	parentspanContext, err := extractor()
 	if err != nil {
@@ -80,7 +100,8 @@ func (h *handler) ListOrders(c echo.Context) error {
 	}
 	span := tracer.StartSpan("List Orders Handler", zipkin.Kind(model.Client), zipkin.Parent(*parentspanContext))
 	defer span.Finish()
-
+	c.Set("span", span)
+	c.Set("tracer", tracer)
 	orders, err := h.db.GetAll(c)
 	if err != nil {
 		span.Tag("error", "Faild_Get_All_Order_Handler")

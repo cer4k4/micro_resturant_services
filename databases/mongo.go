@@ -36,6 +36,7 @@ func (m *mongoDB) Create(ctx echo.Context, order models.Order) (models.Order, er
 		spanDB.Tag("error", err.Error())
 		return models.Order{}, err
 	}
+	spanDB.Tag("MongoQuery", "db.orders.insertOne({_id: ObjectId(), items: [{menu_id: '1',quantity: 1,unit_price: 10.99}],status: 'pending'})")
 	order.ID = result.InsertedID.(primitive.ObjectID)
 	return order, nil
 }

@@ -16,8 +16,8 @@ func main() {
 	repository := databases.NewMongoDB(configServer.MongoClient)
 
 	e := echo.New()
-	api.Middleware(e, configServer)
-	api.Routes(repository, e)
+	//api.Middleware(e, configServer)
+	api.Routes(repository, e, configServer)
 
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
