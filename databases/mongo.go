@@ -55,7 +55,7 @@ func (m *mongoDB) GetAll(ctx echo.Context) ([]models.Restaurant, error) {
 		return []models.Restaurant{}, err
 	}
 	defer cursor.Close(context.TODO())
-
+	spanDB.Tag("MonogQuery", "db['restaurants'].find()")
 	var restaurants []models.Restaurant
 	for cursor.Next(context.TODO()) {
 		var restaurant models.Restaurant

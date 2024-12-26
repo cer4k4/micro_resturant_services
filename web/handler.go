@@ -6,6 +6,8 @@ import (
 	"resturant/databases"
 	"resturant/models"
 
+	httpReporter "github.com/openzipkin/zipkin-go/reporter/http"
+
 	"github.com/labstack/echo/v4"
 	"github.com/openzipkin/zipkin-go"
 	"github.com/openzipkin/zipkin-go/model"
@@ -18,18 +20,26 @@ type Handler interface {
 }
 
 type handler struct {
-	db databases.MongoDBRepository
+	db           databases.MongoDBRepository
+	configServer models.ServiceConfig
 }
 
-func NewHandler(db databases.MongoDBRepository) handler {
-	return handler{db}
+func NewHandler(db databases.MongoDBRepository, configServer models.ServiceConfig) handler {
+	return handler{db, configServer}
 }
 
 func (h *handler) CreateRestaurant(c echo.Context) error {
-	tracer := c.Get("tracer").(*zipkin.Tracer)
+	reporter := httpReporter.NewReporter(h.configServer.ZipkinEndpoint)
+	endpoint, _ := zipkin.NewEndpoint("Create Resturant Service", "localhost:"+h.configServer.ServerPort)
+	tracer, err := zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(endpoint))
+	if err != nil {
+		log.Println("tracer in Middleware", err)
+	}
+
 	span := tracer.StartSpan("Create Restaurant Handler")
 	defer span.Finish()
-
+	c.Set("span", span)
+	c.Set("tracer", tracer)
 	var restaurant models.Restaurant
 	if err := c.Bind(&restaurant); err != nil {
 		span.Tag("error", err.Error())
@@ -45,7 +55,14 @@ func (h *handler) CreateRestaurant(c echo.Context) error {
 }
 
 func (h *handler) ListRestaurants(c echo.Context) error {
-	tracer := c.Get("tracer").(*zipkin.Tracer)
+	reporter := httpReporter.NewReporter(h.configServer.ZipkinEndpoint)
+	endpoint, _ := zipkin.NewEndpoint("List Resturant Service", "localhost:"+h.configServer.ServerPort)
+	tracer, err := zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(endpoint))
+	c.Set("tracer", tracer)
+
+	if err != nil {
+		log.Println("tracer in Middleware", err)
+	}
 	extractor := b3.ExtractHTTP(c.Request())
 	spanContext, err := extractor()
 	if err != nil {
@@ -53,7 +70,7 @@ func (h *handler) ListRestaurants(c echo.Context) error {
 	}
 	span := tracer.StartSpan("List Restaurants Handler", zipkin.Kind(model.Client), zipkin.Parent(*spanContext))
 	defer span.Finish()
-
+	c.Set("span", span)
 	resturants, err := h.db.GetAll(c)
 	if err != nil {
 		span.Tag("error", err.Error())
