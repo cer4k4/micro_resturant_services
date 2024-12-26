@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 
+	httpReporter "github.com/openzipkin/zipkin-go/reporter/http"
+
 	"github.com/labstack/echo/v4"
 	"github.com/openzipkin/zipkin-go"
 	"github.com/openzipkin/zipkin-go/model"
@@ -19,18 +21,26 @@ type Handler interface {
 }
 
 type handler struct {
-	db databases.MongoDBRepository
+	db           databases.MongoDBRepository
+	configServer models.ServiceConfig
 }
 
-func NewHandler(db databases.MongoDBRepository) handler {
-	return handler{db}
+func NewHandler(db databases.MongoDBRepository, configServer models.ServiceConfig) handler {
+	return handler{db, configServer}
 }
 
 func (h *handler) CreateDelivery(c echo.Context) error {
-	tracer := c.Get("tracer").(*zipkin.Tracer)
+
+	reporter := httpReporter.NewReporter(h.configServer.ZipkinEndpoint)
+	endpoint, _ := zipkin.NewEndpoint("CreateDelivery", "localhost:"+h.configServer.ServerPort)
+	tracer, err := zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(endpoint))
+	if err != nil {
+		log.Println("tracer in Middleware", err)
+	}
 	span := tracer.StartSpan("Create_Delivery_Handler", zipkin.Kind(model.Server))
 	defer span.Finish()
 	c.Set("span", span)
+	c.Set("tracer", tracer)
 	req, err := http.NewRequest("GET", "http://localhost:8082/orders", http.NoBody)
 	req.Header.Set("Content-Type", "application/json")
 	if err != nil {
@@ -77,9 +87,17 @@ func (h *handler) CreateDelivery(c echo.Context) error {
 }
 
 func (h *handler) ListDeliveries(c echo.Context) error {
-	tracer := c.Get("tracer").(zipkin.Tracer)
+
+	reporter := httpReporter.NewReporter(h.configServer.ZipkinEndpoint)
+	endpoint, _ := zipkin.NewEndpoint("List Deliveries", "localhost:"+h.configServer.ServerPort)
+	tracer, err := zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(endpoint))
+	if err != nil {
+		log.Println("tracer in Middleware", err)
+	}
 	span := tracer.StartSpan("List_Deliveries_Handler")
 	defer span.Finish()
+	c.Set("span", span)
+	c.Set("tracer", tracer)
 	list, err := h.db.GetAll(c)
 
 	if err != nil {

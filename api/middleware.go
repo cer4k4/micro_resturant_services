@@ -20,6 +20,7 @@ func Middleware(e *echo.Echo, configServer models.ServiceConfig) {
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			// Extract trace context from request
+			c.Set("reporter", reporter)
 			c.Set("tracer", tracer)
 			return next(c)
 		}
