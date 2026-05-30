@@ -375,7 +375,7 @@ This project is open source and available under the MIT License.
 
 For issues and questions:
 - GitHub Issues: [Project Issues](https://github.com/cer4k4/micro_resturant_services/issues)
-- Email: [Your Email]
+- Email: cer4k4@gmail.com
 
 ---
 
