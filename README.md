@@ -16,16 +16,16 @@ This project demonstrates a modern microservices architecture implementing:
 The system consists of three independent microservices:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                   Restaurant Services                        │
-├──────────────────────┬──────────────────────┬────────────────┤
+┌───────────────────────────────────────────────────────────────┐
+│                   Restaurant Services                         │
+├──────────────────────┬──────────────────────┬─────────────────┤
 │  Restaurant Service  │   Order Service      │ Delivery Service│
-│  (Port 8080)         │   (Port 8082)        │   (Port 8083)  │
-│                      │                      │                │
-│  • Menu Management   │  • Order Creation    │  • Track Orders│
+│  (Port 8080)         │   (Port 8082)        │   (Port 8083)   │
+│                      │                      │                 │
+│  • Menu Management   │  • Order Creation    │  • Track Orders │
 │  • Availability      │  • Order Listing     │  • Assign Driver│
 │  • Restaurant Info   │  • Order Status      │  • Update Status│
-└──────────────────────┴──────────────────────┴────────────────┘
+└──────────────────────┴──────────────────────┴─────────────────┘
             ↓                    ↓                     ↓
         MongoDB              MongoDB                MongoDB
      (restaurantdb)        (orderdb)           (deliverydb)
@@ -38,20 +38,20 @@ Each service follows **Hexagonal Architecture** principles:
 ```
 ┌─────────────────────────────────────────────────────┐
 │              APPLICATION/DOMAIN LAYER               │
-│         (Business Logic - Framework Agnostic)      │
+│         (Business Logic - Framework Agnostic)       │
 ├─────────────────────────────────────────────────────┤
 │                                                     │
-│  INBOUND PORTS          OUTBOUND PORTS             │
-│  (Interfaces)           (Interfaces)               │
+│  INBOUND PORTS          OUTBOUND PORTS              │
+│  (Interfaces)           (Interfaces)                │
 │    ↓                        ↓                       │
 ├─────────────────────────────────────────────────────┤
 │                                                     │
-│  INBOUND ADAPTERS       OUTBOUND ADAPTERS          │
-│  (HTTP Handlers)        (Database, Services)       │
+│  INBOUND ADAPTERS       OUTBOUND ADAPTERS           │
+│  (HTTP Handlers)        (Database, Services)        │
 │    ↓                        ↓                       │
 ├─────────────────────────────────────────────────────┤
 │                                                     │
-│  EXTERNAL SYSTEMS (HTTP APIs, Databases, etc.)    │
+│  EXTERNAL SYSTEMS (HTTP APIs, Databases, etc.)      │
 │                                                     │
 └─────────────────────────────────────────────────────┘
 ```
